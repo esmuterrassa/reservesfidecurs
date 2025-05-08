@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+  <meta charset="UTF-8">
+  <title>Reserva d'entrades - Concert Final de Curs</title>
+  <style>
+    body {
+      background-color: #f4f4f4;
+      text-align: center;
+      font-family: Arial, sans-serif;
+    }
+    #auditorium-container {
+      position: relative;
+      width: 700px;
+      height: 600px;
+      margin: 0 auto;
+      background-color: #ddd;
+      border: 1px solid #999;
+    }
+    .seat {
+      position: absolute;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background-color: green;
+      border: 2px solid black;
+      cursor: pointer;
+      transition: background-color 0.3s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      color: white;
+    }
+    .reserved {
+      background-color: red !important;
+      pointer-events: none;
+    }
+    .selected {
+      background-color: orange !important;
+    }
+    #controls {
+      margin: 20px;
+    }
+    #controls input, #controls textarea {
+      padding: 8px;
+      font-size: 14px;
+      margin: 5px;
+      width: 250px;
+    }
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+    }
+  </style>
+</head>
+<body>
+  <h2>Reserva d'Entrades - Concert Final de Curs 2024/25</h2>
+  <div id="controls">
+    <input type="email" id="email" placeholder="Adreça electrònica" required><br>
+    <input type="text" id="nom" placeholder="Nom i cognoms" required><br>
+    <input type="tel" id="telefon" placeholder="Telèfon de contacte" required><br>
+    <input type="number" id="quantitat" placeholder="Nº d'entrades" min="1" max="10" required><br>
+    <textarea id="observacions" placeholder="Observacions"></textarea><br>
+    <button onclick="reservarSeleccionats()">Reservar</button>
+  </div>
+
+  <div id="auditorium-container" style="margin-bottom: 20px;"></div>
+
+  <div style="position: relative; height: 40px;">
+    <div style="position:absolute; left:50%; transform:translateX(-50%); top:10px; font-weight:bold; font-size:20px;">ESCENARI</div>
+  </div>
+
+  <script>
+    const scriptURL = 'https://script.google.com/macros/s/AKfycbwLVE-QSA8z4fOStAdSFR8w4hOa6aG6HifdJQyFxg9QUjTIGVfTTY4h9-zP0WEihFdg/exec'; // Sustituir con tu URL de Apps Script
+
+    let reservedSeats = [];
+
+    fetch(scriptURL)
+      .then(response => response.json())
+      .then(data => {
+        reservedSeats = Array.isArray(data) ? data.map(r => r.asiento || r[0]) : [];
+        reservedSeats.forEach(id => {
+          const el = document.querySelector(`[data-seat='${id}']`);
+          if (el) el.classList.add('reserved');
+        });
+      });
+
+    document.addEventListener("DOMContentLoaded", () => {
+      const container = document.getElementById("auditorium-container");
+      const rowCount = 17;
+      const seatsPerSide = 10;
+      for (let row = rowCount; row >= 1; row--) {
+        const top = 32 + (rowCount - row) * 32;
+        const fila = "F" + row;
+
+        for (let i = 0; i < seatsPerSide; i++) {
+          const seatNumL = (i + 1) * 2;
+          const seatNumR = i * 2 + 1;
+          const left = 300 - i * 26;
+          const right = 430 + i * 26;
+
+          if (!(row === 1 && (seatNumL === 20 || seatNumR === 19))) {
+            const seatL = document.createElement("div");
+            seatL.className = "seat";
+            seatL.textContent = seatNumL;
+            seatL.dataset.seat = `${fila}-L-${seatNumL}`;
+            seatL.style.top = top + "px";
+            seatL.style.left = left + "px";
+            container.appendChild(seatL);
+
+            const seatR = document.createElement("div");
+            seatR.className = "seat";
+            seatR.textContent = seatNumR;
+            seatR.dataset.seat = `${fila}-R-${seatNumR}`;
+            seatR.style.top = top + "px";
+            seatR.style.left = right + "px";
+            container.appendChild(seatR);
+          }
+        }
+
+        const label = document.createElement("div");
+        label.style.position = "absolute";
+        label.style.left = "390px";
+        label.style.top = (top + 4) + "px";
+        label.style.fontSize = "12px";
+        label.style.fontWeight = "bold";
+        label.textContent = row;
+        container.appendChild(label);
+      }
+
+      document.querySelectorAll('.seat').forEach(seat => {
+        seat.addEventListener('click', () => {
+          if (!seat.classList.contains('reserved')) {
+            const max = parseInt(document.getElementById('quantitat').value || '0');
+            const selected = document.querySelectorAll('.seat.selected').length;
+            seat.classList.toggle('selected', !seat.classList.contains('selected') && selected < max);
+          }
+        });
+      });
+    });
+
+    function reservarSeleccionats() {
+      const email = document.getElementById('email').value.trim();
+      const nom = document.getElementById('nom').value.trim();
+      const telefon = document.getElementById('telefon').value.trim();
+      const quantitat = parseInt(document.getElementById('quantitat').value.trim());
+      const observacions = document.getElementById('observacions').value.trim();
+
+      const seleccionats = Array.from(document.querySelectorAll('.seat.selected'));
+      if (!email || !nom || !telefon || !quantitat || seleccionats.length !== quantitat) {
+        alert("Revisa les dades del formulari i selecciona exactament " + quantitat + " localitats.");
+        return;
+      }
+
+      seleccionats.forEach(seat => {
+        const data = {
+          "adreça electrònica": email,
+          "Nom i cognoms": nom,
+          "Telèfon": telefon,
+          "Nº d'entrades": quantitat,
+          "Observacions": observacions,
+          "asiento": seat.dataset.seat
+        };
+
+        fetch(scriptURL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        })
+        .then(res => res.json())
+        .then(() => {
+          seat.classList.remove('selected');
+          seat.classList.add('reserved');
+        });
+      });
+
+      document.getElementById('email').value = "";
+      document.getElementById('nom').value = "";
+      document.getElementById('telefon').value = "";
+      document.getElementById('quantitat').value = "";
+      document.getElementById('observacions').value = "";
+      document.querySelectorAll('.seat.selected').forEach(seat => seat.classList.remove('selected'));
+
+      alert("Reserva enviada correctament. Rebràs un correu de confirmació.");
+    }
+  </script>
+
+  <div style="margin-top: 20px;">
+    <img src="logo_esmut_para_poster-removebg-preview.png" alt="Logo ESMUT" style="height: 80px;"><br>
+    <div style="font-size: 14px; margin-top: 8px;">
+      C/ Ramón y Cajal, 60-62 &nbsp; 08222 Terrassa<br>
+      Tel.: 931 779 257 &nbsp;&nbsp; e-mail: info@esmut.cat
+    </div>
+  </div>
+</body>
+</html>
